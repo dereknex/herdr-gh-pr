@@ -40,7 +40,8 @@ if(kind === "herdr") {
   else if(args[0] === "agent" && args[1] === "prompt") {
     if(f.promptFail) {console.error("transport failed after possible submission");process.exit(1);}
     result({type:"agent_prompted",agent:agent(args[2])});
-  } else result({type:"ok"});
+  } else if(args[0] === "pane" && args[1] === "report-metadata") { /* silent success, no JSON envelope */ }
+  else result({type:"ok"});
 } else {
   if(f.ghFail) {console.error("HTTP 503 fixture");process.exit(1);}
   if(args[0] === "pr" && args[1] === "view") {

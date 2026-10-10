@@ -2,7 +2,7 @@ import { $ } from "bun";
 import { parsePrNumber, refreshingLabel, resolvePaneCwd } from "./label";
 import { lastCheckMs, recordCheck, THROTTLE_WINDOW_MS, throttleElapsed } from "./throttle";
 import { loadConfig } from "./config";
-import { herdrJson, sendRepair, deliveryKey } from "./delivery";
+import { herdrJson, herdrQuiet, sendRepair, deliveryKey } from "./delivery";
 import { branchInfo, fetchSnapshot, snapshotLabel, ghJson, type Snapshot } from "./pr";
 import { acquireLock, readState, writeState, type PaneCache } from "./state";
 
@@ -18,10 +18,10 @@ export async function resolvePane(targetPaneId?: string): Promise<Pane | null> {
 
 export async function setLabel(paneId: string, text: string): Promise<void> {
   const safe = Array.from(text.replace(/[\x00-\x1f\x7f]/g, " ")).slice(0, 80).join("");
-  await herdrJson(["pane", "report-metadata", paneId, "--source", "gh-pr", "--token", `pr=${safe}`]);
+  await herdrQuiet(["pane", "report-metadata", paneId, "--source", "gh-pr", "--token", `pr=${safe}`]);
 }
 async function clearLabel(paneId: string): Promise<void> {
-  await herdrJson(["pane", "report-metadata", paneId, "--source", "gh-pr", "--clear-token", "pr"]);
+  await herdrQuiet(["pane", "report-metadata", paneId, "--source", "gh-pr", "--clear-token", "pr"]);
 }
 
 function statusLabel(s: Snapshot, delivery: string): string {

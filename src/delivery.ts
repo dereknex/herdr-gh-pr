@@ -25,6 +25,13 @@ export async function herdrJson(args: string[]): Promise<any> {
   return response.result;
 }
 
+// pane.report_metadata succeeds silently: exit 0 with no JSON envelope, so its
+// stdout must not be parsed. Only the exit code carries meaning.
+export async function herdrQuiet(args: string[]): Promise<void> {
+  const out = await $`${herdr()} ${args}`.nothrow().quiet();
+  if (out.exitCode !== 0) throw new Error(out.stderr.toString().trim() || `herdr exited ${out.exitCode}`);
+}
+
 export function deliveryKey(s: Snapshot): string {
   return `${process.env.HERDR_SOCKET_PATH ?? "default"}:${s.root}:${s.url}`;
 }
