@@ -1,0 +1,29 @@
+# Copy to the directory printed by: herdr plugin config-dir gh-pr
+# Changes take effect on the next actual refresh or action.
+auto_send = false
+cooldown_seconds = 600
+recipient = ""
+check_names = []
+review_authors = []
+
+# To replace the default prompt, put one of these above [triggers]:
+# prompt_file = "repair-prompt.txt"
+# prompt = """Check {pr_url} on {branch}. Verify and fix: {issues}
+# Checks: {checks}
+# Review: {review_feedback}
+# Conflicts: {conflicts}"""
+
+[triggers]
+pr_conflict = true
+local_conflict = false
+checks_failed = true
+review_feedback = true
+
+# Optional overrides by absolute git worktree root.
+# [repositories."/absolute/path/to/worktree"]
+# auto_send = true
+# recipient = "fixer"
+# check_names = ["test", "lint"]
+# review_authors = ["reviewer", "bot[bot]"]
+# [repositories."/absolute/path/to/worktree".triggers]
+# local_conflict = true

@@ -1,8 +1,8 @@
 id = "gh-pr"
 name = "GitHub PR Status"
 version = "0.4.0" # x-release-please-version
-min_herdr_version = "0.7.4"
-description = "Labels the focused agent pane's sidebar row with its branch's GitHub PR status."
+min_herdr_version = "0.9.3"
+description = "PR status, conflicts, checks, review feedback, and configurable repair prompts."
 platforms = ["macos", "linux"]
 
 # Commands are run directly (no shell), so bun is invoked explicitly rather than
@@ -39,3 +39,23 @@ id = "open-pr"
 title = "Open PR in browser"
 contexts = ["workspace"]
 command = ["bun", "bin/open-pr.ts"]
+
+[[actions]]
+id = "details"
+title = "View PR details"
+contexts = ["workspace"]
+command = ["bun", "bin/open-details.ts"]
+
+[[actions]]
+id = "send-repair"
+title = "Send PR repair prompt"
+contexts = ["workspace"]
+command = ["bun", "bin/send-repair.ts"]
+
+[[panes]]
+id = "details"
+title = "PR details"
+placement = "popup"
+width = "85%"
+height = "85%"
+command = ["bun", "bin/details.ts"]

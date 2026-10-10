@@ -1,81 +1,132 @@
 # herdr-plugin-gh-pr
 
-Shows the GitHub PR status of the focused **agent** pane's current git branch as a label on that pane's row in the herdr sidebar. The label reads like `#123 ✓` (the PR number plus a compact status symbol: ✓ passing CI, ✗ failing CI, ● pending CI, ◆ merged, ⊘ closed, and no symbol for an open PR with no checks). While the status is being recomputed, the symbol is replaced with `⟳`.
+Shows the focused agent pane's branch PR status in the herdr sidebar, including merge conflicts, local git conflicts, CI checks, and pending review feedback. An on-demand popup shows details. Optional repair prompts can be submitted to a matching agent.
 
 ## Requirements
 
-- herdr >= 0.7.4
-- `bun`, `git`, and `gh` (authenticated: `gh auth status`) on your PATH
+- herdr >= 0.9.3 (client and server, for plugin popups and agent prompts)
+- Bun, git, and authenticated gh on PATH
+- GitHub permission to read the repository's PRs, reviews, and checks
 
 ## Install
-
-From GitHub (your local git must have access, the repo is private):
 
 ```bash
 herdr plugin install wyattjoh/herdr-plugin-gh-pr
 ```
 
-Or link a local checkout for development:
+Or link a local checkout:
 
 ```bash
 herdr plugin link /path/to/herdr-plugin-gh-pr
 ```
 
-That is the entire install. No daemon, no config. herdr runs the hooks with `bun`, so `bun` must be on your PATH.
+No daemon or polling process is required. Auto-send is off by default.
 
-### Optional keybindings
+## Sidebar
 
-herdr has no plugin-extensible right-click menu, and a plugin cannot ship its own keybinding (the manifest has no `key` field and keybindings live only in the user's config). To trigger the actions with a keystroke, add them to `~/.config/herdr/config.toml` and run `herdr server reload-config`:
-
-```toml
-[[keys.command]]
-key = "prefix+u"
-type = "plugin_action"
-command = "gh-pr.open-pr"
-description = "open PR in browser"
-
-[[keys.command]]
-key = "prefix+i"
-type = "plugin_action"
-command = "gh-pr.refresh"
-description = "refresh PR status"
-```
-
-Then press your prefix (default `ctrl+b`) followed by `u` (open PR) or `i` (refresh status). Avoid `alt+` chords (they emit characters in the terminal), and pick a key that does not collide with a built-in: `o` (notifications), `g` (goto), `r` (resize), `v` (split), and `e` (edit scrollback) are taken by default. `herdr server reload-config` reports any conflict as a `partial` status.
-
-## Sidebar setup
-
-The plugin writes its label to a named `pr` token (`pane.report_metadata --token pr=VALUE`). herdr's
-packed sidebar row layout only shows tokens you place in your row config, so add `$pr` to the agent
-row in `~/.config/herdr/config.toml`:
+Add `$pr` to the agent rows in `~/.config/herdr/config.toml`, then run `herdr server reload-config`:
 
 ```toml
 [ui.sidebar.agents]
 rows = [["state_icon", "workspace", "$pr"], ["agent"]]
 ```
 
-Then `herdr server reload-config`. Without `$pr` in a row, the token is still written but nothing
-renders it.
+Example: `#123 · conflict · CI ✗2 · ●1 · Review 3/1`.
 
-## Use
+- `conflict`: the PR conflicts with its base branch. `merge?`: GitHub has not determined mergeability.
+- `local conflict N`: N unresolved files in the local git index, independent of PR mergeability.
+- `CI ✗N`, `●N`, `cancelled N`, `CI ✓`: failed, pending, cancelled, or passing/skipped checks.
+- `Review N/M`: N unresolved, non-outdated review threads and M active requests for changes. Bot feedback is included. Ordinary PR comments are excluded.
+- `◆`: merged. `⊘`: closed. `⟳`: refreshing.
+- `sent`: submitted, with repair results still reported by the agent. `queued`, `recipient needed`, `sent?`: deferred, ambiguous recipient, or uncertain delivery.
+- `error`: refresh/config/command failure. The previous result is retained when it belongs to the same worktree and branch; its timestamp and error are visible in details. It may be stale.
 
-Focus an agent pane sitting in a git repo whose branch has a PR. The label appears and refreshes when you switch panes or open/create worktrees. To avoid hammering the GitHub API, the automatic path checks at most once per pane every 30 seconds; a manual refresh always updates immediately.
+Sidebar values are capped at 80 characters. Details contain all checks with links, conflict files, feedback authors, bodies, code locations, and links.
 
-Refresh the focused pane's PR status on demand:
+## Refresh and actions
+
+The existing refresh model is retained: `pane.focused`, `worktree.opened`, and `worktree.created`. Automatic refreshes are throttled to once per pane per 30 seconds. A branch change bypasses the throttle; manual refresh always bypasses it. There is no periodic refresh. Changes on GitHub and deferred prompts are reconsidered at the next event or manual refresh.
 
 ```bash
 herdr plugin action invoke gh-pr.refresh
-```
-
-Open the focused pane's branch PR in the browser:
-
-```bash
 herdr plugin action invoke gh-pr.open-pr
+herdr plugin action invoke gh-pr.details
+herdr plugin action invoke gh-pr.send-repair
 ```
 
-The qualified action id uses a dot (`gh-pr.open-pr`), not a slash.
+`details` opens a scrollable popup and fetches current data without sending a repair prompt. Use arrows, j/k, or PgUp/PgDn to scroll; q or Escape closes it. `send-repair` refreshes and explicitly submits the configured prompt, bypassing auto-send enablement, deduplication, and cooldown. It still requires a ready matching agent, an open PR, and enabled trigger issues.
+
+Actions can be bound in herdr's config:
+
+```toml
+[[keys.command]]
+key = "prefix+i"
+type = "plugin_action"
+command = "gh-pr.refresh"
+description = "refresh PR status"
+
+[[keys.command]]
+key = "prefix+p"
+type = "plugin_action"
+command = "gh-pr.details"
+description = "view PR details"
+```
+
+Choose unused keys and run `herdr server reload-config`. Plugins cannot add context-menu items or ship keybindings.
+
+## Configuration
+
+Find the directory with `herdr plugin config-dir gh-pr`. Create `config.toml` there; it is re-read on the next actual refresh or action. The checked-in [config.example.toml](config.example.toml) contains the defaults.
+
+```toml
+auto_send = false
+cooldown_seconds = 600
+recipient = "" # Live agent name or pane ID; empty selects a unique match.
+check_names = [] # Exact check names; empty includes all.
+review_authors = [] # Exact GitHub logins; empty includes humans and bots.
+
+[triggers]
+pr_conflict = true
+local_conflict = false
+checks_failed = true
+review_feedback = true
+
+[repositories."/absolute/path/to/worktree"]
+auto_send = true
+recipient = "fixer"
+check_names = ["test", "lint"]
+```
+
+Overrides match the absolute git worktree root, so each worktree can have its own policy. Selected values override global defaults; unspecified fields are inherited. Trigger types use OR: any enabled, matching issue qualifies. Multiple issues are combined into one prompt. Invalid keys, values, templates, or missing template files fail visibly and prevent sending.
+
+### Custom prompt
+
+Set either `prompt` (TOML multiline string) or `prompt_file` (absolute path or relative to the plugin config directory):
+
+```toml
+prompt_file = "repair-prompt.txt"
+```
+
+Supported variables are `{pr_url}`, `{branch}`, `{issues}`, `{checks}`, `{review_feedback}`, and `{conflicts}`. Unknown variable names fail. Feedback is inserted as data once; braces inside it are not interpreted as template variables.
+
+The [default prompt](src/config.ts) asks the agent to verify applicability, fix current issues, run relevant validation, and report changes and unresolved issues. It treats review text as information to assess. Commit, push, merge, GitHub replies, and resolving threads require existing user authorization. A custom template controls the submitted instructions.
+
+### Auto-send rules
+
+- Only open PRs qualify. Current-head failed checks trigger; pending, cancelled, skipped, and unknown states do not. Local conflicts only trigger if explicitly enabled.
+- Each issue version is sent once. Comment edits, new comments, changed CI runs, or an issue that disappears and later recurs can qualify again. Initial existing issues qualify when auto-send is enabled. Sending all issues together marks all current issue versions as sent.
+- The default cooldown is 10 minutes per session, worktree, and PR, across panes. Persisted records and locks prevent overlapping refreshes from submitting duplicates.
+- Only a unique matching agent, or a configured matching recipient, can receive prompts. Multiple matches without a recipient defer delivery. An agent must be `idle` or `done`; `working`, `blocked`, and `unknown` defer delivery until a later refresh. The plugin does not answer approval dialogs.
+- Before sending, it re-fetches PR issues and rechecks agent identity, readiness, worktree, branch, and head. Local HEAD must equal the PR head, so unpushed local changes prevent submission.
+- A successful submission means text and Enter were delivered, not that a repair started or completed. An uncertain submission stops further automatic attempts; inspect the agent and use `send-repair` if a retry is needed.
+
+Runtime state lives in `HERDR_PLUGIN_STATE_DIR`. Removing it resets caches, cooldown, and deduplication, so existing issues can trigger again.
 
 ## Develop
 
-- `bun test` runs the unit tests.
-- `herdr plugin log list gh-pr` shows hook output.
+```bash
+bun test
+herdr plugin log list gh-pr
+```
+
+No external npm dependencies or build step. Tests include real git worktrees and fixture CLIs, without prompting live agents.

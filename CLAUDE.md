@@ -1,38 +1,25 @@
 # herdr-plugin-gh-pr
 
-A herdr plugin (v0.7.4+) that labels the focused **agent** pane's sidebar row with the GitHub PR status of that pane's current git branch, via a named `pr` token.
+Bun + TypeScript, zero external npm dependencies. herdr >= 0.9.3.
 
-## How it works
+## Runtime contracts
 
-herdr exposes no overlay, status bar, or corner UI, and no background daemon. As of 0.7.4, sidebar rows are laid out from configurable named tokens (`$name` syntax); the legacy `custom_status` field is no longer rendered in the packed row layout. This plugin reports its label as the `pr` token (`pane.report_metadata --token pr=VALUE`), which renders only for panes with a detected agent. Workspaces and tabs have no equivalent status-label mechanism (tokens are pane-only), so the label lives on the agent pane. Users place `$pr` in their `[ui.sidebar.agents]` row config to show it. So this plugin is event-driven: herdr invokes `bin/update-pr-status.ts` on `pane.focused`, `worktree.opened`, and `worktree.created`. The script resolves the focused pane's cwd, derives the branch, queries `gh`, and writes the token.
+- `pr` is a pane metadata token under source `gh-pr`; users include `$pr` in sidebar agent rows. Values have an 80-character limit. Do not use legacy `custom_status`.
+- Refresh remains event-driven: pane focus and worktree open/create, per-pane 30-second throttle, manual force bypass. Branch changes bypass the throttle. There is no polling daemon.
+- PR snapshots include GitHub mergeability, local index conflicts, all current-head checks, unresolved non-outdated threads, and active requests for changes. Queries paginate threads, thread comments, and reviews. Errors retain a same-branch snapshot with a visible stale/error indicator.
+- Config belongs under `HERDR_PLUGIN_CONFIG_DIR`; state under `HERDR_PLUGIN_STATE_DIR`. Auto-send defaults off. Validate config before sending; state IO errors must prevent submission.
+- Prompt submission uses `herdr agent prompt`, a unique matching or configured recipient, and `idle`/`done` only. Revalidate issues, agent identity, root, branch, and head. Local HEAD must equal PR head. Persist the attempt before IO; uncertain delivery blocks automatic retries.
+- Locks serialize pane refresh and PR submission. Deduplication and cooldown are shared across panes for the session/worktree/PR. Manual send bypasses those policies, but still validates readiness and issue eligibility.
+- Details use a plugin-owned terminal popup. Its action passes the target pane explicitly because a popup has no pane ID. Details fetch without sending; sanitize external text before terminal rendering.
+- Manifest commands invoke Bun explicitly. Actions use workspace context and resolve the focused pane. No external dependencies means no install build step.
 
-While a refresh is in flight, the pane's icon is swapped for `⟳` (the PR number is kept), then it settles to a terminal PR symbol (`◆` merged, `⊘` closed) or the final CI symbol.
+Read README.md for configuration, prompt variables, trigger semantics, and actions. The 0.7.4 capability research in docs/research/herdr-plugin-overlay.md is historical; installed CLI/schema and current official docs are authoritative for newer APIs.
 
-The automatic (event) path is throttled to one gh check per pane every `THROTTLE_WINDOW_MS` (30s), tracked via per-pane timestamp files under `HERDR_PLUGIN_STATE_DIR` (see `src/throttle.ts`). The manual refresh action sets `HERDR_PLUGIN_ACTION_ID`, which the entrypoint turns into `force = true` to bypass the throttle.
+## Development
 
-Actions: `refresh` re-runs the labeler on demand; `open-pr` opens the focused pane's branch PR in the browser (`bin/open-pr.ts`). herdr has no plugin-extensible right-click menu, so actions surface via the CLI or a `plugin_action` keybinding, not a context menu.
-
-Manifest commands invoke `bun` explicitly (`["bun", "bin/..."]`) rather than relying on the script shebang + execute bit, which is undocumented for GitHub installs. Action `contexts` is `["workspace"]` (the only doc-confirmed value); the actions self-resolve the focused pane via `pane.current`, so they do not need a pane-scoped context. The plugin is single-file and dependency-free, so there is no `[[build]]` step.
-
-See `docs/research/herdr-plugin-overlay.md` for the full capability research and citations.
-
-## Layout
-
-- `herdr-plugin.toml` - manifest (events, action).
-- `bin/update-pr-status.ts` - executable entrypoint herdr invokes per event/action.
-- `src/label.ts` - pure label-composition logic (unit tested).
-- `src/main.ts` - orchestration and IO (herdr/git/gh).
-- `tests/label.test.ts` - unit tests for the pure logic.
-
-## Develop
-
-- Install locally: `herdr plugin link .`
-- Run tests: `bun test`
-- Force a label update on the focused pane: `herdr plugin action invoke gh-pr.refresh` (or run `bin/update-pr-status.ts` directly inside a repo pane). Note the qualified id uses a dot (`gh-pr.refresh`), not a slash.
-- Inspect logs: `herdr plugin log list gh-pr`
+`bun test` includes pure logic and end-to-end CLI fixtures with real git worktrees. Keep tests isolated from live herdr agents. Log inspection: `herdr plugin log list gh-pr`.
 
 ## Conventions
 
-- Bun + TypeScript, no external npm dependencies.
 - No em dashes in code, comments, or docs.
-- Metadata `source` is always `gh-pr`.
+- Metadata source is always `gh-pr`.
