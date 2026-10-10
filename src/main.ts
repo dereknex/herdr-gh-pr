@@ -1,6 +1,6 @@
 import { $ } from "bun";
 import { parsePrNumber, refreshingLabel, resolvePaneCwd } from "./label";
-import { lastCheckMs, recordCheck, THROTTLE_WINDOW_MS, throttleElapsed } from "./throttle";
+import { lastCheckMs, recordCheck, resetThrottle, THROTTLE_WINDOW_MS, throttleElapsed } from "./throttle";
 import { loadConfig } from "./config";
 import { herdrJson, herdrQuiet, sendRepair, deliveryKey } from "./delivery";
 import { branchInfo, fetchSnapshot, snapshotLabel, ghJson, type Snapshot } from "./pr";
@@ -81,6 +81,7 @@ export async function run(targetPaneId?: string, force = false, manualSend = fal
       const current = live ? await branchInfo(live.cwd) : null;
       if (current?.root !== info.root || current.branch !== info.branch) {
         writeState("pane", pane.paneId, current ?? { root: "", branch: "" });
+        resetThrottle(pane.paneId);
         await clearLabel(pane.paneId);
       } else {
         const retained = snapshot ?? (sameBranch ? old?.snapshot : undefined);

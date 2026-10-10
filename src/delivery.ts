@@ -45,8 +45,30 @@ export function reconcile(state: DeliveryState, issues: Issue[]): string[] {
 }
 
 export function chooseRecipient(agents: Agent[], recipient: string): Agent | null {
-  if (recipient) return agents.find(a => a.pane_id === recipient || a.name === recipient) ?? null;
+  if (recipient) {
+    const byPane = agents.filter(a => a.pane_id === recipient);
+    if (byPane.length === 1) return byPane[0];
+    if (byPane.length > 1) return null;
+    const byName = agents.filter(a => a.name === recipient);
+    return byName.length === 1 ? byName[0] : null;
+  }
   return agents.length === 1 ? agents[0] : null;
+}
+
+export function sameAgentIdentity(actual: Agent, expected: Agent): boolean {
+  if (!actual?.agent || !expected?.agent) return false;
+  if (actual.pane_id !== expected.pane_id || actual.agent !== expected.agent) return false;
+  if (actual.agent_session != null || expected.agent_session != null) {
+    if (digest(actual.agent_session) !== digest(expected.agent_session)) return false;
+  }
+  const hasActualRev = typeof actual.revision === "number";
+  const hasExpectedRev = typeof expected.revision === "number";
+  if (hasActualRev && hasExpectedRev) {
+    if (actual.revision !== expected.revision) return false;
+  } else if (actual.agent_session == null && expected.agent_session == null) {
+    return false;
+  }
+  return true;
 }
 
 async function matchingAgents(s: Snapshot): Promise<Agent[]> {
@@ -79,14 +101,14 @@ export async function sendRepair(s: Snapshot, config: Config, manual: boolean): 
   const live = (await herdrJson(["agent", "get", agent.pane_id])).agent as Agent;
   const cwd = live && resolvePaneCwd(live);
   const info = cwd ? await branchInfo(cwd) : null;
-  if (!live?.agent || live.pane_id !== agent.pane_id || live.agent !== agent.agent || digest(live.agent_session) !== digest(agent.agent_session) || info?.root !== s.root || info.branch !== s.branch) return save("agent or branch changed; refresh again");
+  if (!sameAgentIdentity(live, agent) || info?.root !== s.root || info.branch !== s.branch) return save("agent or branch changed; refresh again");
   if (!["idle", "done"].includes(live.agent_status) || live.interactive_ready === false) return save(`waiting for agent (${live.agent_status})`);
   const verified = await fetchSnapshot(s.root, s.branch);
   if (!verified || verified.url !== s.url || verified.headRefOid !== s.headRefOid || digest(issuesFor(verified, config)) !== digest(issues)) return save("issues changed; refresh again");
   const finalAgent = (await herdrJson(["agent", "get", agent.pane_id])).agent as Agent;
   const finalCwd = finalAgent && resolvePaneCwd(finalAgent);
   const finalBranch = finalCwd ? await branchInfo(finalCwd) : null;
-  if (!finalAgent?.agent || finalAgent.agent !== live.agent || digest(finalAgent.agent_session) !== digest(live.agent_session) || finalBranch?.root !== s.root || finalBranch.branch !== s.branch || !["idle", "done"].includes(finalAgent.agent_status) || finalAgent.interactive_ready === false) return save("agent state changed; refresh again");
+  if (!sameAgentIdentity(finalAgent, live) || finalBranch?.root !== s.root || finalBranch.branch !== s.branch || !["idle", "done"].includes(finalAgent.agent_status) || finalAgent.interactive_ready === false) return save("agent state changed; refresh again");
   const head = await $`git -C ${s.root} rev-parse HEAD`.nothrow().quiet();
   if (head.exitCode !== 0 || head.stdout.toString().trim() !== s.headRefOid) return save("local HEAD differs from PR head; sync first");
   const currentPr = await $`gh pr view ${s.number} --json headRefOid,state`.cwd(s.root).nothrow().quiet();

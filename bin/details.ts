@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 import { resolvePane } from "../src/main";
 import { branchInfo, detailText, fetchSnapshot } from "../src/pr";
-import { readState, writeState, type PaneCache } from "../src/state";
+import { readState, type PaneCache } from "../src/state";
 import { loadConfig } from "../src/config";
-import { displayLines } from "../src/display";
+import { displayLines, sanitizeTerminalText } from "../src/display";
 
 async function details(): Promise<string> {
   const pane = await resolvePane(process.env.GH_PR_TARGET_PANE);
@@ -21,15 +21,14 @@ async function details(): Promise<string> {
     if (branch?.root !== info.root || branch.branch !== info.branch) throw new Error("Pane changed branch during refresh");
     return `${detailText(snapshot)}\n\nDelivery: ${cache?.snapshot?.url === snapshot.url ? cache.delivery || "No submission recorded in this pane" : "No submission recorded"}${cache?.error ? `\nPrevious refresh error: ${cache.error}` : ""}`;
   } catch (error) {
-    const message = String(error);
-    writeState("pane", pane.paneId, { ...info, snapshot: cache?.snapshot, delivery: cache?.delivery, error: message });
+    const message = error instanceof Error ? error.message : String(error);
     return `Refresh failed: ${message}\n\n${cache?.snapshot ? `Previous result (may be stale)\n${detailText(cache.snapshot)}` : "No previous result."}`;
   }
 }
 
 async function main(): Promise<void> {
   let text = "Loading PR details...";
-  if (!process.stdin.isTTY || !process.stdout.isTTY) { console.log(await details()); return; }
+  if (!process.stdin.isTTY || !process.stdout.isTTY) { console.log(sanitizeTerminalText(await details())); return; }
   let offset = 0;
   const render = () => {
     const lines = displayLines(text, Math.max(10, (process.stdout.columns || 80) - 2));

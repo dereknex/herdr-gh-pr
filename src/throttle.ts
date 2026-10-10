@@ -39,3 +39,8 @@ export function recordCheck(paneId: string, nowMs: number): void {
     // Best effort: if we cannot persist, the pane just re-checks next time.
   }
 }
+
+export function resetThrottle(paneId: string): void {
+  recordCheck(paneId, 0);
+}
+

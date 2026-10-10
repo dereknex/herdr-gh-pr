@@ -49,8 +49,41 @@ export function acquireLock(key: string): (() => void) | null {
   catch (e: any) {
     if (e.code !== "EEXIST") throw e;
     const recovery = `${path}.recovery`;
-    try { mkdirSync(recovery); }
-    catch (error: any) { if (error.code === "EEXIST") return null; throw error; }
+    const recOwnerFile = join(recovery, "owner.json");
+    const acquireRecovery = (): boolean => {
+      try {
+        mkdirSync(recovery);
+        try { writeFileSync(recOwnerFile, JSON.stringify({ pid: process.pid, time: Date.now() }), { mode: 0o600 }); } catch {}
+        return true;
+      } catch (error: any) {
+        if (error.code !== "EEXIST") throw error;
+        let isDead = false;
+        try {
+          let recOwner: { pid: number } | undefined;
+          try { recOwner = JSON.parse(readFileSync(recOwnerFile, "utf8")); } catch {}
+          if (recOwner && Number.isSafeInteger(recOwner.pid) && recOwner.pid > 0) {
+            try { process.kill(recOwner.pid, 0); }
+            catch (kErr: any) { if (kErr.code === "ESRCH") isDead = true; }
+          }
+          if (!isDead) {
+            const age = Date.now() - statSync(recovery).mtimeMs;
+            if (age > 30_000) isDead = true;
+          }
+        } catch {}
+        if (isDead) {
+          try {
+            rmSync(recovery, { recursive: true, force: true });
+            mkdirSync(recovery);
+            try { writeFileSync(recOwnerFile, JSON.stringify({ pid: process.pid, time: Date.now() }), { mode: 0o600 }); } catch {}
+            return true;
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      }
+    };
+    if (!acquireRecovery()) return null;
     try {
       let owner: { pid: number; token: string } | undefined;
       try { owner = JSON.parse(readFileSync(ownerFile, "utf8")); }

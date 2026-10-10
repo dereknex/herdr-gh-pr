@@ -46,7 +46,7 @@ export const DEFAULT_CONFIG: Config = {
 
 const VARIABLES = new Set(["pr_url", "branch", "issues", "checks", "review_feedback", "conflicts"]);
 export function renderPrompt(template: string, values: Record<string, string>): string {
-  return template.replace(/\{([a-z_]+)\}/g, (match, key) => {
+  return template.replace(/\{([a-zA-Z0-9_-]+)\}/g, (match, key) => {
     if (!VARIABLES.has(key)) throw new Error(`Unknown prompt variable: ${match}`);
     return values[key] ?? "";
   });

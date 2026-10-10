@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
 import { DEFAULT_CONFIG, DEFAULT_PROMPT, parseConfig, renderPrompt } from "../src/config";
 import { detailText, issuesFor, snapshotLabel, type Snapshot } from "../src/pr";
-import { chooseRecipient, reconcile } from "../src/delivery";
+import { chooseRecipient, reconcile, sameAgentIdentity } from "../src/delivery";
 import { emptyDelivery } from "../src/state";
-import { displayLines } from "../src/display";
+import { displayLines, sanitizeTerminalText } from "../src/display";
 
 export function snapshot(): Snapshot {
   return { root: "/repo", branch: "feature", number: 7, state: "OPEN", url: "https://github.com/o/r/pull/7", title: "PR", headRefOid: "abc", mergeable: "MERGEABLE", reviewDecision: "CHANGES_REQUESTED", fetchedAt: 1, localConflicts: [], checks: [], feedback: [] };
@@ -19,11 +19,15 @@ test("config merges only the selected repository, validates typos, and defaults 
   expect(() => parseConfig("cooldown_seconds = -1", "/repo", "/tmp")).toThrow();
   expect(() => parseConfig("[triggers]\nunknown = true", "/repo", "/tmp")).toThrow();
   expect(() => parseConfig("prompt = '{typo}'", "/repo", "/tmp")).toThrow();
+  expect(() => parseConfig("prompt = '{issues1}'", "/repo", "/tmp")).toThrow();
+  expect(() => parseConfig("prompt = '{PR_URL}'", "/repo", "/tmp")).toThrow();
 });
 
 test("prompt variables substitute once so review text cannot become another template variable", () => {
   expect(renderPrompt("{issues} {branch}", { issues: "{branch}", branch: "feature" })).toBe("{branch} feature");
   expect(renderPrompt(DEFAULT_PROMPT, {}).trim()).not.toBe("");
+  expect(() => renderPrompt("{issues1}", {})).toThrow();
+  expect(() => renderPrompt("{PR_URL}", {})).toThrow();
 });
 
 test("only failed checks and enabled conflict types trigger, with exact check and author filters", () => {
@@ -63,6 +67,27 @@ test("recipient selection never chooses arbitrarily between matching agents", ()
   expect(chooseRecipient(agents, "b")?.name).toBe("b");
   expect(chooseRecipient([agents[0]], "")).toBe(agents[0]);
   expect(chooseRecipient(agents, "missing")).toBeNull();
+
+  // Ambiguous configured recipient names return null
+  const dups = [{ name: "shared", pane_id: "p1", agent_status: "idle", revision: 1 }, { name: "shared", pane_id: "p2", agent_status: "idle", revision: 1 }];
+  expect(chooseRecipient(dups, "shared")).toBeNull();
+  // Exact pane_id resolves even when names are duplicated
+  expect(chooseRecipient(dups, "p1")?.pane_id).toBe("p1");
+});
+
+test("agent identity requires matching pane, agent type, revision, and session", () => {
+  const base = { name: "bot", pane_id: "p1", agent: "codex", agent_status: "idle", revision: 1 };
+  expect(sameAgentIdentity(base, base)).toBe(true);
+  expect(sameAgentIdentity(base, { ...base, revision: 2 })).toBe(false);
+  expect(sameAgentIdentity(base, { ...base, agent: "other" })).toBe(false);
+  expect(sameAgentIdentity(base, { ...base, pane_id: "p2" })).toBe(false);
+  expect(sameAgentIdentity({ ...base, revision: undefined as any }, { ...base, revision: undefined as any })).toBe(false);
+  expect(sameAgentIdentity({ ...base, agent_session: { s: 1 } }, { ...base, agent_session: { s: 2 } })).toBe(false);
+  expect(sameAgentIdentity({ ...base, agent_session: { s: 1 } }, { ...base, agent_session: { s: 1 } })).toBe(true);
+});
+
+test("sanitizeTerminalText removes terminal escapes and controls", () => {
+  expect(sanitizeTerminalText("\x1b[31mred\x1b[0m\x1b]0;title\x07hello\x00world\t!")).toBe("redhelloworld    !");
 });
 
 test("summary and details preserve conflict, review and CI information", () => {
