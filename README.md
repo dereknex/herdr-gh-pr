@@ -54,7 +54,7 @@ herdr plugin action invoke gh-pr.details
 herdr plugin action invoke gh-pr.send-repair
 ```
 
-`details` opens a scrollable popup and fetches current data without sending a repair prompt. Use arrows, j/k, or PgUp/PgDn to scroll; q or Escape closes it. `send-repair` refreshes and explicitly submits the configured prompt, bypassing auto-send enablement, deduplication, and cooldown. It still requires a ready matching agent, an open PR, and enabled trigger issues.
+`details` opens a scrollable popup and fetches current data without sending a repair prompt. Use arrows, j/k, or PgUp/PgDn to scroll; q or Escape closes it. `send-repair` refreshes and explicitly submits the configured prompt, bypassing auto-send enablement, deduplication, cooldown, and the clean-worktree check. It can therefore prompt an agent while local changes are uncommitted. It still requires a ready matching agent, an open PR, and enabled trigger issues.
 
 Actions can be bound in herdr's config:
 
@@ -117,7 +117,8 @@ The [default prompt](src/config.ts) asks the agent to verify applicability, fix 
 - Each issue version is sent once. Comment edits, new comments, changed CI runs, or an issue that disappears and later recurs can qualify again. Initial existing issues qualify when auto-send is enabled. Sending all issues together marks all current issue versions as sent.
 - The default cooldown is 10 minutes per session, worktree, and PR, across panes. Persisted records and locks prevent overlapping refreshes from submitting duplicates.
 - Only a unique matching agent, or a configured matching recipient, can receive prompts. Multiple matches without a recipient defer delivery. An agent must be `idle` or `done`; `working`, `blocked`, and `unknown` defer delivery until a later refresh. The plugin does not answer approval dialogs.
-- Before sending, it re-fetches PR issues and rechecks agent identity, readiness, worktree, branch, and head. Local HEAD must equal the PR head, so unpushed local changes prevent submission.
+- Before sending, it re-fetches PR issues and rechecks agent identity, readiness, worktree, branch, and head. Local HEAD must equal the PR head, so unpushed commits prevent submission, including manual submission.
+- Automatic sending also requires a clean worktree, including staged, unstaged, untracked, and submodule changes. Ignored files do not block it. A dirty worktree shows `queued` and the reason in details; after changes are committed and pushed, a later refresh re-evaluates the issues. Local index conflicts also make the worktree dirty, so the `local_conflict` trigger requires manual `send-repair`.
 - A successful submission means text and Enter were delivered, not that a repair started or completed. An uncertain submission stops further automatic attempts; inspect the agent and use `send-repair` if a retry is needed.
 
 Runtime state lives in `HERDR_PLUGIN_STATE_DIR`. Removing it resets caches, cooldown, and deduplication, so existing issues can trigger again.

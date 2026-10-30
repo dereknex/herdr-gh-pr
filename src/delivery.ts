@@ -115,6 +115,11 @@ export async function sendRepair(s: Snapshot, config: Config, manual: boolean): 
   if (currentPr.exitCode !== 0) throw new Error(currentPr.stderr.toString().trim() || "Unable to revalidate PR");
   const pr = JSON.parse(currentPr.stdout.toString());
   if (pr.state !== "OPEN" || pr.headRefOid !== s.headRefOid) return save("PR changed; refresh again");
+  if (!manual) {
+    const worktree = await $`git -C ${s.root} status --porcelain --untracked-files=normal --ignore-submodules=none`.nothrow().quiet();
+    if (worktree.exitCode !== 0) throw new Error(worktree.stderr.toString().trim() || "Unable to check worktree status");
+    if (worktree.stdout.length) return save("uncommitted worktree changes; commit and push before auto-send");
+  }
   const text = renderPrompt(config.prompt, promptValues(verified, issues));
   state.pendingAttempt = manual ? issues.map(i => i.key) : fresh;
   state.lastAttempt = Date.now();

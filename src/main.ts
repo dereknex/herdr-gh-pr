@@ -25,7 +25,7 @@ async function clearLabel(paneId: string): Promise<void> {
 }
 
 function statusLabel(s: Snapshot, delivery: string): string {
-  const marker = delivery.startsWith("prompt submitted") ? "sent" : delivery === "recipient selection needed" ? "recipient needed" : /^(waiting for agent|cooldown)/.test(delivery) ? "queued" : delivery.startsWith("delivery result unknown") ? "sent?" : "";
+  const marker = delivery.startsWith("prompt submitted") ? "sent" : delivery === "recipient selection needed" ? "recipient needed" : /^(waiting for agent|cooldown|uncommitted worktree changes)/.test(delivery) ? "queued" : delivery.startsWith("delivery result unknown") ? "sent?" : "";
   return [snapshotLabel(s), marker].filter(Boolean).join(" · ");
 }
 
