@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0](https://github.com/dereknex/herdr-gh-pr/compare/v0.4.0...v0.5.0) (2026-10-30)
+
+
+### Features
+
+* **plugin:** add pr details, repair prompts, and feedback aggregation ([99553a0](https://github.com/dereknex/herdr-gh-pr/commit/99553a012fed5c2b0e467387c3d77422bf7a7d02))
+* require clean worktree for automatic repair prompts ([7858993](https://github.com/dereknex/herdr-gh-pr/commit/785899348b7fadb17e868a93bbd25e95b5a26994))
+* require clean worktree for automatic repair prompts ([8c5402b](https://github.com/dereknex/herdr-gh-pr/commit/8c5402bffa4241c9f4fd6b96516a6f74c723261a))
+
+
+### Bug Fixes
+
+* address PR review feedback on locks, recipient resolution, and sanitization ([c912c93](https://github.com/dereknex/herdr-gh-pr/commit/c912c931b402df48ca4ae8f4be44e65a44bf0946))
+* **delivery:** add herdrQuiet for silent metadata calls ([a557f8b](https://github.com/dereknex/herdr-gh-pr/commit/a557f8b16b3a2a4456be5e02725ccc0f02fe052e))
+
 ## [0.4.0](https://github.com/dereknex/herdr-gh-pr/compare/v0.3.0...v0.4.0) (2026-07-16)
 
 
