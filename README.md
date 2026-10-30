@@ -11,7 +11,7 @@ Shows the focused agent pane's branch PR status in the herdr sidebar, including 
 ## Install
 
 ```bash
-herdr plugin install wyattjoh/herdr-plugin-gh-pr
+herdr plugin install dereknex/herdr-gh-pr
 ```
 
 Or link a local checkout:
@@ -40,6 +40,8 @@ Example: `#123 · conflict · CI ✗2 · ●1 · Review 3/1`.
 - `◆`: merged. `⊘`: closed. `⟳`: refreshing.
 - `sent`: submitted, with repair results still reported by the agent. `queued`, `recipient needed`, `sent?`: deferred, ambiguous recipient, or uncertain delivery.
 - `error`: refresh/config/command failure. The previous result is retained when it belongs to the same worktree and branch; its timestamp and error are visible in details. It may be stale.
+
+Sidebar tokens are plain text: herdr styles them with color, bold, and dim, and does not render hyperlinks. To open the PR, use the `gh-pr.open-pr` action on a key binding, or click the PR URL in details, which runs in a terminal pane.
 
 Sidebar values are capped at 80 characters. Details contain all checks with links, conflict files, feedback authors, bodies, code locations, and links.
 

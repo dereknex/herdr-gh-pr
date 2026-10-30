@@ -389,7 +389,7 @@ conflicts with the stated "publish as a private GitHub repo" — see item 2.
   in standard GitHub repo files, not the manifest.)
 - **`id` format (verbatim):** *"Plugin ids may use ASCII letters, digits, dot, colon, underscore,
   and hyphen."* Action/pane/link-handler ids **cannot use dots**. No convention ties the plugin id
-  to the repo name (so `gh-pr` or a namespaced `wyattjoh:gh-pr` are both fine).
+  to the repo name (so `gh-pr` or a namespaced `dereknex:gh-pr` are both fine).
 - **At least one entrypoint is required:** *"The manifest must declare at least one action, pane, or
   event."* Our `[[events]]` + `[[actions]]` set satisfies this.
 - **`[[build]]` for a Bun/TS plugin:** build runs *"during GitHub `plugin install` after
@@ -414,7 +414,7 @@ conflicts with the stated "publish as a private GitHub repo" — see item 2.
   repo cannot be listed/discovered.** Direct GitHub install (`herdr plugin install owner/repo`)
   *"clones with git"* — so a **private repo will install only if the user's local git has
   credentials** (SSH key or token) for it; herdr does not document its own auth path (doc gap).
-  Net: a private `wyattjoh/herdr-plugin-gh-pr` is fine for personal/`plugin install` use with your
+  Net: a private `dereknex/herdr-gh-pr` is fine for personal/`plugin install` use with your
   own git creds and for `plugin link` dev, but it will NOT appear in the marketplace and won't
   install for anyone lacking repo access. If marketplace discovery is ever wanted, the repo must be
   public + topic-tagged. **Flag this to confirm private is intentional.**
@@ -467,7 +467,7 @@ conflicts with the stated "publish as a private GitHub repo" — see item 2.
 - **`HERDR_PLUGIN_CONTEXT_JSON` exact schema is undocumented** (gap) — log it once and inspect rather
   than assuming fields.
 - **README:** document prerequisites (bun, gh authenticated, git), install command
-  (`herdr plugin install wyattjoh/herdr-plugin-gh-pr`), and the public/private caveat.
+  (`herdr plugin install dereknex/herdr-gh-pr`), and the public/private caveat.
 - **Dev/publish parity:** because `plugin link` skips `[[build]]`, anything that only works after a
   build will pass in dev and break on GitHub install. Staying dependency-free (no `[[build]]`)
   removes this whole failure class.
