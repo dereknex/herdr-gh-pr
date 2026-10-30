@@ -1,6 +1,6 @@
 id = "gh-pr"
 name = "GitHub PR Status"
-version = "0.4.0" # x-release-please-version
+version = "0.5.0" # x-release-please-version
 min_herdr_version = "0.9.3"
 description = "PR status, conflicts, checks, review feedback, and configurable repair prompts."
 platforms = ["macos", "linux"]
